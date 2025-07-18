@@ -1,3 +1,4 @@
+
 // src/ai/flows/automated-vlog-generation.ts
 'use server';
 
@@ -44,10 +45,16 @@ export async function generateVlog(input: GenerateVlogInput): Promise<GenerateVl
 const vlogContentPrompt = ai.definePrompt({
   name: 'vlogContentPrompt',
   input: {schema: GenerateVlogInputSchema},
-  output: {schema: GenerateVlogOutputSchema},
+  output: {schema: z.object({
+      vlogTitle: z.string().describe("The title of the generated vlog."),
+      vlogDescription: z.string().describe("A short description of the vlog."),
+      visualSummaryImage: z.string().describe("A prompt for an image generation model to create a visual summary of the vlog content."),
+      narrationAudioScript: z.string().describe("The script for the narration audio.")
+    })
+  },
   prompt: `You are an AI assistant that generates content for automated vlogs of local areas.
 
-  Based on the location and trending topics, create a compelling vlog title, description, visual summary image, and narration audio script.
+  Based on the location and trending topics, create a compelling vlog title, description, a prompt for an image generation AI, and a narration audio script.
 
   Location: {{{location}}}
   Trending Topics: {{{trendingTopics}}}
@@ -56,16 +63,9 @@ const vlogContentPrompt = ai.definePrompt({
   1.  Come up with a vlog title that captures the essence of the location and trending topics.
   2.  Write a concise vlog description (around 50 words) summarizing the content.
   3.  Compose a narration script (around 100 words) to guide the visual summary and provide context to viewers.
-  4.  Describe the overall theme and objects contained within the visual summary image, and provide explicit details so that it can be rendered by an image generation AI.
+  4.  Create a detailed prompt for an image generation model that describes the overall theme and objects for a visual summary image.
 
-  Output the vlog title, description, visual summary image theme and objects, and narration audio script in JSON format.
-  Make sure the visual summary image theme and objects can be used as a prompt to generate an image.
-  { \
-vlogTitle: string,
-vlogDescription: string,
-visualSummaryImage: string // theme and objects
-narrationAudioScript: string
-  }
+  Output the vlog title, description, image prompt, and narration script in the required format.
   `,
 });
 
@@ -97,7 +97,7 @@ const generateVlogFlow = ai.defineFlow(
 
     // Generate the narration audio from the narration audio script
     const {media: narrationAudioMedia} = await ai.generate({
-      model: ai.model('gemini-2.5-flash-preview-tts'),
+      model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
