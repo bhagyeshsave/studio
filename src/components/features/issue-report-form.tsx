@@ -82,68 +82,71 @@ export function IssueReportForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-
     let issueDocRef;
     try {
-        const userId = "anonymous_user";
-        const userName = "Anonymous";
+      const userId = "anonymous_user"; // In a real app, this would come from auth
+      const userName = "Anonymous";
 
-        issueDocRef = await addDoc(collection(db, "issues"), {
-            title: values.title,
-            description: values.description,
-            category: values.category,
-            location: values.location,
-            imageUrl: "",
+      // 1. Create the document in Firestore first.
+      issueDocRef = await addDoc(collection(db, "issues"), {
+        title: values.title,
+        description: values.description,
+        category: values.category,
+        location: values.location,
+        imageUrl: "",
+        status: "Reported",
+        reporterId: userId,
+        reporter: userName,
+        reportedAt: serverTimestamp(),
+        upvotes: 0,
+        updates: [
+          {
             status: "Reported",
-            reporterId: userId,
-            reporter: userName,
-            reportedAt: serverTimestamp(),
-            upvotes: 0,
-            updates: [
-                {
-                    status: "Reported",
-                    date: serverTimestamp(),
-                    comment: "Issue submitted by user."
-                }
-            ]
-        });
+            date: new Date(), // Use client-side date here
+            comment: "Issue submitted by user."
+          }
+        ]
+      });
+
+      // 2. Give immediate feedback to the user and reset the form.
+      toast({
+        title: "Issue Reported!",
+        description: "Thank you for your submission. Your media is uploading in the background if attached.",
+      });
+      form.reset();
+      setPreview(null);
+      setFileType(null);
+      setIsSubmitting(false);
 
     } catch (error) {
-        console.error("Error creating Firestore document:", error);
-        toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
-        setIsSubmitting(false);
-        return; // Stop execution if Firestore fails
+      console.error("Error creating Firestore document:", error);
+      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
+      setIsSubmitting(false);
+      return;
     }
 
-    // Give immediate feedback to the user
-    toast({
-        title: "Issue Reported!",
-        description: "Thank you for helping improve our community. Your media is uploading in the background.",
-    });
-    
-    // Reset form and UI state immediately
-    form.reset();
-    setPreview(null);
-    setFileType(null);
-    setIsSubmitting(false);
-    
-    // Handle file upload in the background
+    // 3. Handle file upload in the background.
     const mediaFile = values.media;
     if (mediaFile && issueDocRef) {
-        try {
-            console.log("Starting media upload in background...");
-            const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
-            const uploadResult = await uploadBytes(storageRef, mediaFile);
-            const mediaUrl = await getDownloadURL(uploadResult.ref);
-            
-            await updateDoc(doc(db, "issues", issueDocRef.id), {
-                imageUrl: mediaUrl
-            });
-            console.log("Background media upload and document update complete.");
-        } catch(error) {
-            console.error("Background media upload failed:", error);
-            // Optionally, you could add a toast here to inform the user the upload failed
-        }
+      try {
+        console.log("Starting media upload in background...");
+        const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
+        const uploadResult = await uploadBytes(storageRef, mediaFile);
+        const mediaUrl = await getDownloadURL(uploadResult.ref);
+
+        await updateDoc(doc(db, "issues", issueDocRef.id), {
+            imageUrl: mediaUrl
+        });
+        console.log("Background media upload and document update complete.");
+      } catch (uploadError) {
+        console.error("Background media upload failed:", uploadError);
+        // Optionally, inform the user about the upload failure, but don't block them.
+        toast({
+          variant: 'destructive',
+          title: "Media Upload Failed",
+          description: "Your issue was reported, but the attached media failed to upload. You can try editing the issue later."
+        });
+      }
     }
   }
 
