@@ -27,7 +27,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
-import { Wrapper } from "@googlemaps/react-wrapper";
 import Image from "next/image";
 import { db, storage } from "@/lib/firebase/config";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
@@ -51,75 +50,6 @@ const formSchema = z.object({
   media: z.instanceof(File).optional(),
 });
 
-const render = (status: "loading" | "failure" | "success") => {
-    if (status === 'loading') return <div>Loading...</div>
-    if (status === 'failure') return <div>Error loading maps</div>
-    return null;
-}
-
-function LocationInput({ field }: { field: any }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [sessionToken, setSessionToken] = useState<google.maps.places.AutocompleteSessionToken>();
-  const [geoLocation, setGeoLocation] = useState<{lat: number, lng: number} | null>(null);
-
-  useEffect(() => {
-    if (!window.google || !inputRef.current) return;
-    
-    setSessionToken(new google.maps.places.AutocompleteSessionToken());
-
-    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-        fields: ["formatted_address", "geometry"],
-        types: ["geocode"],
-    });
-
-    autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-            field.onChange(place.formatted_address);
-        }
-        if (place.geometry?.location) {
-            setGeoLocation({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
-        }
-    });
-
-    return () => {
-      // Clean up listeners
-      if (window.google) {
-        google.maps.event.clearInstanceListeners(autocomplete);
-      }
-    };
-  }, [field]);
-  
-  useEffect(() => {
-    const getGeoLocation = () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                setGeoLocation({
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                });
-            });
-        }
-    }
-    getGeoLocation();
-  }, [])
-
-
-  return (
-    <div className="relative">
-      <Input
-        {...field}
-        ref={inputRef}
-        placeholder="e.g., Corner of 1st Ave & Elm St"
-        className="pr-10"
-      />
-       <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8">
-            <MapPin className="h-5 w-5 text-muted-foreground" />
-       </Button>
-    </div>
-  );
-}
-
 
 export function IssueReportForm() {
   const [preview, setPreview] = useState<string | null>(null);
@@ -136,20 +66,16 @@ export function IssueReportForm() {
     },
   });
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if(file.size > 25 * 1024 * 1024) { // 25MB limit
          toast({ variant: 'destructive', title: "File too large", description: "Please upload a file smaller than 25MB." });
          return;
       }
-      try {
-        form.setValue("media", file);
-        setPreview(URL.createObjectURL(file));
-        setFileType(file.type);
-      } catch (error) {
-        toast({ variant: 'destructive', title: "Error reading file", description: "Could not process the selected file." });
-      }
+      form.setValue("media", file);
+      setPreview(URL.createObjectURL(file));
+      setFileType(file.type);
     }
   };
 
@@ -158,17 +84,15 @@ export function IssueReportForm() {
     setIsSubmitting(true);
 
     try {
-        // Hardcoding user for now, in a real app this would come from an auth context
         const userId = "anonymous_user";
         const userName = "Anonymous";
 
-        // Create the issue document in Firestore first.
         const issueDocRef = await addDoc(collection(db, "issues"), {
             title: values.title,
             description: values.description,
             category: values.category,
             location: values.location,
-            imageUrl: "", // Initially empty
+            imageUrl: "",
             status: "Reported",
             reporterId: userId,
             reporter: userName,
@@ -183,27 +107,29 @@ export function IssueReportForm() {
             ]
         });
 
-        // The form is now "submitted" from the user's perspective.
         toast({
             title: "Issue Reported!",
-            description: "Thank you for helping improve our community. Your media is being uploaded.",
+            description: "Thank you for helping improve our community.",
         });
+        
+        const mediaFile = values.media;
+        
+        // Reset form and UI state immediately
         form.reset();
         setPreview(null);
         setFileType(null);
         setIsSubmitting(false);
 
-        // If there's a media file, upload it in the background and update the doc.
-        if (values.media) {
+        if (mediaFile) {
+            console.log("Starting media upload in background...");
             const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
-            const uploadResult = await uploadBytes(storageRef, values.media);
+            const uploadResult = await uploadBytes(storageRef, mediaFile);
             const mediaUrl = await getDownloadURL(uploadResult.ref);
             
-            // Update the document with the media URL.
             await updateDoc(doc(db, "issues", issueDocRef.id), {
                 imageUrl: mediaUrl
             });
-            console.log("Media uploaded and document updated successfully.");
+            console.log("Background media upload and document update complete.");
         }
 
     } catch (error) {
@@ -214,117 +140,120 @@ export function IssueReportForm() {
   }
 
   return (
-    <Wrapper apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} libraries={["places"]} render={render}>
-        <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <Form {...form}>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+        control={form.control}
+        name="title"
+        render={({ field }) => (
+            <FormItem>
+            <FormLabel>Issue Title</FormLabel>
+            <FormControl>
+                <Input placeholder="e.g., Overflowing trash can on Main St." {...field} />
+            </FormControl>
+            <FormDescription>
+                A short, clear title for the issue.
+            </FormDescription>
+            <FormMessage />
+            </FormItem>
+        )}
+        />
+        <FormField
+        control={form.control}
+        name="description"
+        render={({ field }) => (
+            <FormItem>
+            <FormLabel>Description</FormLabel>
+            <FormControl>
+                <Textarea
+                placeholder="Provide details about the issue, its location, and any other relevant information."
+                className="resize-y min-h-[120px]"
+                {...field}
+                />
+            </FormControl>
+            <FormMessage />
+            </FormItem>
+        )}
+        />
+        <div className="grid md:grid-cols-2 gap-8">
             <FormField
             control={form.control}
-            name="title"
+            name="category"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Issue Title</FormLabel>
+                <FormLabel>Category</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select an issue category" />
+                    </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                    {issueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="location"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Location</FormLabel>
                 <FormControl>
-                    <Input placeholder="e.g., Overflowing trash can on Main St." {...field} />
+                    <div className="relative">
+                        <Input
+                            placeholder="e.g., Corner of 1st Ave & Elm St"
+                            {...field}
+                            className="pr-10"
+                        />
+                        <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    </div>
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        </div>
+        <FormField
+            control={form.control}
+            name="media"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Photo/Video</FormLabel>
+                <FormControl>
+                    <div className="relative flex items-center justify-center w-full">
+                        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-accent/50 transition-colors">
+                            {preview ? (
+                                <div className="relative w-full h-full">
+                                    {fileType?.startsWith('image/') && <Image src={preview} layout="fill" objectFit="contain" alt="Preview" />}
+                                    {fileType?.startsWith('video/') && <video src={preview} className="w-full h-full object-contain" controls />}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                    <p className="text-xs text-muted-foreground">PNG, JPG, MP4 (MAX. 25MB)</p>
+                                </div>
+                            )}
+                            <Input id="dropzone-file" type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
+                        </label>
+                    </div> 
                 </FormControl>
                 <FormDescription>
-                    A short, clear title for the issue.
+                    Adding a photo or video can help resolve the issue faster.
                 </FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
             />
-            <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Description</FormLabel>
-                <FormControl>
-                    <Textarea
-                    placeholder="Provide details about the issue, its location, and any other relevant information."
-                    className="resize-y min-h-[120px]"
-                    {...field}
-                    />
-                </FormControl>
-                <FormMessage />
-                </FormItem>
-            )}
-            />
-            <div className="grid md:grid-cols-2 gap-8">
-                <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select an issue category" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {issueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                        <LocationInput field={field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
-            <FormField
-                control={form.control}
-                name="media"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Photo/Video</FormLabel>
-                    <FormControl>
-                        <div className="relative flex items-center justify-center w-full">
-                            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-accent/50 transition-colors">
-                                {preview ? (
-                                    <div className="relative w-full h-full">
-                                        {fileType?.startsWith('image/') && <Image src={preview} layout="fill" objectFit="contain" alt="Preview" />}
-                                        {fileType?.startsWith('video/') && <video src={preview} className="w-full h-full object-contain" controls />}
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                        <p className="text-xs text-muted-foreground">PNG, JPG, MP4 (MAX. 25MB)</p>
-                                    </div>
-                                )}
-                                <Input id="dropzone-file" type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
-                            </label>
-                        </div> 
-                    </FormControl>
-                    <FormDescription>
-                        Adding a photo or video can help resolve the issue faster.
-                    </FormDescription>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            <Button type="submit" size="lg" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Report
-            </Button>
-        </form>
-        </Form>
-    </Wrapper>
+        <Button type="submit" size="lg" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Submit Report
+        </Button>
+    </form>
+    </Form>
   );
 }
-
-    
