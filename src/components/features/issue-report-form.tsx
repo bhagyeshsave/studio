@@ -84,19 +84,15 @@ export function IssueReportForm() {
     setIsSubmitting(true);
     let issueDocRef;
 
-    try {
-      const userId = "anonymous_user";
-      const userName = "Anonymous";
-
-      const issueData = {
+    const issueData = {
         title: values.title,
         description: values.description,
         category: values.category,
         location: values.location,
         imageUrl: "",
         status: "Reported",
-        reporterId: userId,
-        reporter: userName,
+        reporterId: "anonymous_user",
+        reporter: "Anonymous",
         reportedAt: serverTimestamp(),
         upvotes: 0,
         updates: [
@@ -106,8 +102,9 @@ export function IssueReportForm() {
             comment: "Issue submitted by user."
           }
         ]
-      };
-      
+    };
+
+    try {
       console.log("Attempting to submit the following data to Firestore:", issueData);
 
       issueDocRef = await addDoc(collection(db, "issues"), issueData);
@@ -123,13 +120,18 @@ export function IssueReportForm() {
       form.reset();
       setPreview(null);
       setFileType(null);
-      setIsSubmitting(false);
 
     } catch (error) {
       console.error("Error creating Firestore document:", error);
-      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please ensure your Firestore database is set up correctly and you have permission to write." });
+      toast({ 
+        variant: 'destructive', 
+        title: "Submission Failed", 
+        description: "Could not submit your issue. Please check your Firebase project configuration and ensure the Firestore API is enabled." 
+      });
       setIsSubmitting(false);
       return;
+    } finally {
+        setIsSubmitting(false);
     }
 
     // Handle media upload in the background
