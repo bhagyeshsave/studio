@@ -1,14 +1,66 @@
+
+"use client"
+
 import Image from "next/image";
-import { issues } from "@/data/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { ThumbsUp, MessageSquare, ListFilter, MapPin } from "lucide-react";
+import { ThumbsUp, MessageSquare, ListFilter, MapPin, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { collection, getDocs, onSnapshot, query, orderBy, where, doc, updateDoc, increment } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { toast } from "@/hooks/use-toast";
+
+interface Issue {
+    id: string;
+    title: string;
+    status: string;
+    location: string;
+    reporter: string;
+    reportedAt: {
+        seconds: number;
+        nanoseconds: number;
+    };
+    imageUrl: string;
+    imageHint: string;
+    upvotes: number;
+}
 
 export default function IssuesPage() {
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "issues"), orderBy("reportedAt", "desc"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const issuesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Issue));
+      setIssues(issuesData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching issues:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch issues.' });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleUpvote = async (issueId: string) => {
+    const issueRef = doc(db, "issues", issueId);
+    try {
+      await updateDoc(issueRef, {
+        upvotes: increment(1)
+      });
+      toast({ title: 'Success', description: 'You have upvoted this issue.' });
+    } catch (error) {
+      console.error("Error upvoting issue:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not upvote the issue.' });
+    }
+  };
+
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "Resolved":
@@ -62,32 +114,38 @@ export default function IssuesPage() {
         <Card className="flex-1 flex flex-col">
           <ScrollArea className="h-full">
             <CardContent className="p-0">
-              <div className="divide-y">
-                {issues.map((issue) => (
-                  <div key={issue.id} className="p-4 space-y-3 hover:bg-accent/50 transition-colors">
-                     <div className="relative aspect-video w-full overflow-hidden rounded-md">
-                        {issue.imageUrl && <Image src={issue.imageUrl} data-ai-hint={issue.imageHint} alt={issue.title} layout="fill" objectFit="cover" />}
-                     </div>
-                    <div className="flex items-start justify-between">
-                        <h3 className="font-semibold font-headline">{issue.title}</h3>
-                        <Badge variant={getStatusVariant(issue.status)}>{issue.status}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-2"><MapPin className="w-4 h-4"/> {issue.location}</p>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>By {issue.reporter}</span>
-                        <span>{new Date(issue.reportedAt).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                        <Button variant="outline" size="sm" className="flex-1 gap-2">
-                            <ThumbsUp className="w-4 h-4"/> {issue.upvotes}
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1 gap-2">
-                            <MessageSquare className="w-4 h-4"/> Feedback
-                        </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {loading ? (
+                 <div className="flex items-center justify-center h-full p-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                 </div>
+              ) : (
+                 <div className="divide-y">
+                    {issues.map((issue) => (
+                      <div key={issue.id} className="p-4 space-y-3 hover:bg-accent/50 transition-colors">
+                        <div className="relative aspect-video w-full overflow-hidden rounded-md">
+                            {issue.imageUrl && <Image src={issue.imageUrl} data-ai-hint={issue.imageHint} alt={issue.title} layout="fill" objectFit="cover" />}
+                        </div>
+                        <div className="flex items-start justify-between">
+                            <h3 className="font-semibold font-headline">{issue.title}</h3>
+                            <Badge variant={getStatusVariant(issue.status)}>{issue.status}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground flex items-center gap-2"><MapPin className="w-4 h-4"/> {issue.location}</p>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                            <span>By {issue.reporter === 'anonymous' ? 'Anonymous' : issue.reporter}</span>
+                            <span>{new Date(issue.reportedAt.seconds * 1000).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                            <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => handleUpvote(issue.id)}>
+                                <ThumbsUp className="w-4 h-4"/> {issue.upvotes}
+                            </Button>
+                            <Button variant="outline" size="sm" className="flex-1 gap-2">
+                                <MessageSquare className="w-4 h-4"/> Feedback
+                            </Button>
+                        </div>
+                      </div>
+                    ))}
+                 </div>
+              )}
             </CardContent>
           </ScrollArea>
         </Card>

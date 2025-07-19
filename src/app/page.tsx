@@ -1,19 +1,101 @@
+
+"use client"
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, ShieldCheck, Siren, Trash2, Droplets, Construction } from "lucide-react";
+import { ArrowRight, ShieldCheck, Siren, Trash2, Droplets, Construction, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { communityData } from "@/data/mock-data";
+import { useEffect, useState } from "react";
+import { collection, getDocs, onSnapshot, query } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { toast } from "@/hooks/use-toast";
+import { communityData } from "@/data/mock-data"; // Keep campaigns for now
+
+interface Ward {
+  name: string;
+  wardNumber: number;
+  hygieneRating: number;
+  safetyRating: number;
+  issuesResolved: number;
+  openIssues: number;
+}
+
+interface IssueStats {
+    waste: number;
+    water: number;
+    roads: number;
+}
 
 export default function Dashboard() {
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [issueStats, setIssueStats] = useState<IssueStats>({ waste: 0, water: 0, roads: 0});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch Wards
+    const fetchWards = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "wards"));
+        const wardsData = querySnapshot.docs.map(doc => doc.data() as Ward);
+        setWards(wardsData);
+      } catch (error) {
+        console.error("Error fetching wards:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch ward data." });
+      }
+    };
+
+    // Fetch and listen to Issues for stats
+    const q = query(collection(db, "issues"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const stats: IssueStats = { waste: 0, water: 0, roads: 0 };
+        querySnapshot.forEach((doc) => {
+            const issue = doc.data();
+            switch (issue.category) {
+                case "Waste Management":
+                    stats.waste++;
+                    break;
+                case "Water & Sewage":
+                    stats.water++;
+                    break;
+                case "Roads & Infrastructure":
+                    stats.roads++;
+                    break;
+            }
+        });
+        setIssueStats(stats);
+    }, (error) => {
+        console.error("Error fetching issue stats:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch issue statistics." });
+    });
+
+    const loadData = async () => {
+        setLoading(true);
+        await fetchWards();
+        setLoading(false);
+    }
+
+    loadData();
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+        <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
+            <Loader2 className="w-10 h-10 animate-spin text-primary"/>
+        </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <section>
         <h2 className="text-3xl font-headline font-semibold tracking-tight mb-4">Community Scorecard</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {communityData.wards.map((ward) => (
+          {wards.map((ward) => (
             <Card key={ward.name} className="flex flex-col">
               <CardHeader>
                 <CardTitle>{ward.name}</CardTitle>
@@ -57,7 +139,7 @@ export default function Dashboard() {
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+23</div>
+              <div className="text-2xl font-bold">+{issueStats.waste}</div>
               <p className="text-xs text-muted-foreground">new reports this week</p>
             </CardContent>
           </Card>
@@ -67,7 +149,7 @@ export default function Dashboard() {
               <Droplets className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+8</div>
+              <div className="text-2xl font-bold">+{issueStats.water}</div>
               <p className="text-xs text-muted-foreground">leakages reported</p>
             </CardContent>
           </Card>
@@ -77,7 +159,7 @@ export default function Dashboard() {
               <Construction className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+12</div>
+              <div className="text-2xl font-bold">+{issueStats.roads}</div>
               <p className="text-xs text-muted-foreground">pothole reports</p>
             </CardContent>
           </Card>

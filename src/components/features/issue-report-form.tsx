@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,10 +25,15 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { MapPin, Upload, FileVideo, Image as ImageIcon } from "lucide-react";
+import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
 import { Wrapper } from "@googlemaps/react-wrapper";
 import Image from "next/image";
+import { db, storage } from "@/lib/firebase/config";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from 'uuid';
+
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -62,6 +68,7 @@ const fileToDataUri = (file: File) => new Promise<string>((resolve, reject) => {
 function LocationInput({ field }: { field: any }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sessionToken, setSessionToken] = useState<google.maps.places.AutocompleteSessionToken>();
+  const [geoLocation, setGeoLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
     if (!window.google || !inputRef.current) return;
@@ -78,6 +85,9 @@ function LocationInput({ field }: { field: any }) {
         if (place.formatted_address) {
             field.onChange(place.formatted_address);
         }
+        if (place.geometry?.location) {
+            setGeoLocation({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+        }
     });
 
     return () => {
@@ -92,9 +102,10 @@ function LocationInput({ field }: { field: any }) {
     const getGeoLocation = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition((position) => {
-                // For demonstration, we're not using the coords directly to set the input
-                // but this is where you could reverse-geocode if needed.
-                console.log("User's location:", position.coords);
+                setGeoLocation({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                });
             });
         }
     }
@@ -121,6 +132,7 @@ function LocationInput({ field }: { field: any }) {
 export function IssueReportForm() {
   const [preview, setPreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -151,15 +163,54 @@ export function IssueReportForm() {
   };
 
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    toast({
-      title: "Issue Reported!",
-      description: "Thank you for helping improve our community.",
-    });
-    form.reset();
-    setPreview(null);
-    setFileType(null);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true);
+    let mediaUrl = "";
+
+    try {
+        if(values.media) {
+            const storageRef = ref(storage, `issues/${uuidv4()}`);
+            const uploadResult = await uploadString(storageRef, values.media, 'data_url');
+            mediaUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        // Hardcoding user for now, in a real app this would come from an auth context
+        const userId = "anonymous_user";
+        const userName = "Anonymous";
+
+        await addDoc(collection(db, "issues"), {
+            title: values.title,
+            description: values.description,
+            category: values.category,
+            location: values.location,
+            imageUrl: mediaUrl,
+            status: "Reported",
+            reporterId: userId,
+            reporter: userName,
+            reportedAt: serverTimestamp(),
+            upvotes: 0,
+            updates: [
+                {
+                    status: "Reported",
+                    date: new Date(),
+                    comment: "Issue submitted by user."
+                }
+            ]
+        });
+
+        toast({
+            title: "Issue Reported!",
+            description: "Thank you for helping improve our community.",
+        });
+        form.reset();
+        setPreview(null);
+        setFileType(null);
+    } catch (error) {
+        console.error("Error submitting issue:", error);
+        toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -266,7 +317,10 @@ export function IssueReportForm() {
                     </FormItem>
                 )}
                 />
-            <Button type="submit" size="lg">Submit Report</Button>
+            <Button type="submit" size="lg" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit Report
+            </Button>
         </form>
         </Form>
     </Wrapper>
