@@ -37,7 +37,6 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={cn("min-h-screen bg-background font-body antialiased", poppins.variable, ptSans.variable)}>
         <FirebaseMessagingProvider>
