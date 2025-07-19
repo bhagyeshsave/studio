@@ -48,9 +48,9 @@ export const communityData = {
 
 export const issueCategories = [
   "Waste Management",
-  "Water & Sewage",
-  "Roads & Infrastructure",
-  "Parks & Recreation",
+  "Water and Sewage",
+  "Roads and Infrastructure",
+  "Parks and Recreation",
   "Streetlights",
   "Public Safety",
   "Other",

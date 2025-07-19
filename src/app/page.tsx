@@ -57,10 +57,10 @@ export default function Dashboard() {
                 case "Waste Management":
                     stats.waste++;
                     break;
-                case "Water & Sewage":
+                case "Water and Sewage":
                     stats.water++;
                     break;
-                case "Roads & Infrastructure":
+                case "Roads and Infrastructure":
                     stats.roads++;
                     break;
             }
