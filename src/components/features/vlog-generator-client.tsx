@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { generateVlog, type GenerateVlogOutput } from "@/ai/flows/automated-vlog-generation";
 import { Loader2, Wand2, Film } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 
 const formSchema = z.object({
   location: z.string().min(2, {
@@ -35,6 +35,7 @@ export function VlogGeneratorClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [vlogData, setVlogData] = useState<GenerateVlogOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -46,13 +47,32 @@ export function VlogGeneratorClient() {
     },
   });
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 95) {
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 500);
+    } else {
+      setProgress(0);
+    }
+    return () => clearInterval(timer);
+  }, [isLoading]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setVlogData(null);
     setError(null);
+    setProgress(10);
 
     try {
       const result = await generateVlog(values);
+      setProgress(100);
       setVlogData(result);
     } catch (err) {
       setError("Failed to generate vlog. This can take a minute, please try again.");
@@ -165,13 +185,10 @@ export function VlogGeneratorClient() {
           <CardContent>
             {isLoading && (
               <div className="space-y-4">
-                <div className="flex flex-col items-center justify-center bg-muted aspect-video rounded-lg">
-                    <Film className="w-12 h-12 text-muted-foreground animate-pulse" />
-                    <p className="text-muted-foreground mt-2">Generating video, this may take a moment...</p>
+                 <div className="flex flex-col items-center justify-center bg-muted aspect-video rounded-lg p-8">
+                    <Progress value={progress} className="w-full" />
+                    <p className="text-muted-foreground mt-4 text-center">Generating video, this may take a moment...</p>
                 </div>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
               </div>
             )}
             {error && <p className="text-destructive">{error}</p>}
