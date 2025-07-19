@@ -49,6 +49,7 @@ export function IssueReportForm() {
       title: "",
       description: "",
       location: "",
+      media: null,
     },
   });
 
@@ -151,7 +152,7 @@ export function IssueReportForm() {
                             <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
                             <p className="text-xs text-muted-foreground">SVG, PNG, JPG or MP4 (MAX. 800x400px)</p>
                         </div>
-                        <Input id="dropzone-file" type="file" className="hidden" {...field} />
+                        <Input id="dropzone-file" type="file" className="hidden" value={field.value?.fileName} onChange={(e) => field.onChange(e.target.files?.[0])} />
                     </label>
                 </div> 
               </FormControl>
