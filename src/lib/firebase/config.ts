@@ -18,6 +18,9 @@ const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : get
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// For debugging, log the Firestore instance to the console
+console.log("Firestore DB Instance:", db);
+
 // Initialize Firebase Cloud Messaging and get a reference to the service
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 
