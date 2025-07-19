@@ -119,7 +119,7 @@ const generateVlogFlow = ai.defineFlow(
         },
       }),
       ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts-001'),
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
         prompt: vlogContent.vlogDescription,
         config: {
           responseModalities: ['AUDIO'],
