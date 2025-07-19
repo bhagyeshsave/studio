@@ -15,7 +15,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp;
+if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
+}
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 
@@ -23,7 +29,7 @@ const storage = getStorage(app);
 console.log("Firestore DB Instance:", db);
 
 // Initialize Firebase Cloud Messaging and get a reference to the service
-const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
+const messaging = (typeof window !== 'undefined' && firebaseConfig.projectId) ? getMessaging(app) : null;
 
 
 export { app, db, storage, messaging };
