@@ -87,8 +87,8 @@ export function IssueReportForm() {
       const userId = "anonymous_user"; // In a real app, this would come from auth
       const userName = "Anonymous";
 
-      // 1. Construct the data object explicitly to avoid undefined values.
-      const issueData = {
+      // DEBUG: Drastically simplify the object to find the problematic field.
+      const simplifiedIssueData = {
         title: values.title,
         description: values.description,
         category: values.category,
@@ -107,9 +107,13 @@ export function IssueReportForm() {
           }
         ]
       };
+      
+      console.log("Attempting to submit:", simplifiedIssueData);
 
       // 2. Create the document in Firestore first.
-      issueDocRef = await addDoc(collection(db, "issues"), issueData);
+      issueDocRef = await addDoc(collection(db, "issues"), simplifiedIssueData);
+      
+      console.log("Document created with ID:", issueDocRef.id);
 
       // 3. Give immediate feedback to the user and reset the form.
       toast({
@@ -119,13 +123,15 @@ export function IssueReportForm() {
       form.reset();
       setPreview(null);
       setFileType(null);
-      setIsSubmitting(false);
+      
 
     } catch (error) {
       console.error("Error creating Firestore document:", error);
-      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
+      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please check console for details." });
       setIsSubmitting(false);
       return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     // 4. Handle file upload in the background.
