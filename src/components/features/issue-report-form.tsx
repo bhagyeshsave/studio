@@ -102,7 +102,7 @@ export function IssueReportForm() {
             updates: [
                 {
                     status: "Reported",
-                    date: new Date(),
+                    date: serverTimestamp(),
                     comment: "Issue submitted by user."
                 }
             ]
