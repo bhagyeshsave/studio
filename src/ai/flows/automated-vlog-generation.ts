@@ -11,8 +11,8 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
-import wav from 'wav';
 
 const GenerateVlogInputSchema = z.object({
   location: z.string().describe('The location for which to generate the vlog.'),
@@ -25,15 +25,10 @@ export type GenerateVlogInput = z.infer<typeof GenerateVlogInputSchema>;
 const GenerateVlogOutputSchema = z.object({
   vlogTitle: z.string().describe('The title of the generated vlog.'),
   vlogDescription: z.string().describe('A short description of the vlog.'),
-  visualSummaryImage: z
+  vlogVideo: z
     .string()
     .describe(
-      'A data URI of an image summarizing the vlog content, using Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.' // data URI
-    ),
-  narrationAudio: z
-    .string()
-    .describe(
-      'A data URI of the narration audio for the vlog, using Base64 encoding. Expected format: \'data:audio/wav;base64,<encoded_data>\'.' // data URI for audio/wav
+      'A data URI of the generated vlog video, using Base64 encoding. Expected format: \'data:video/mp4;base64,<encoded_data>\'.' // data URI for video/mp4
     ),
 });
 export type GenerateVlogOutput = z.infer<typeof GenerateVlogOutputSchema>;
@@ -48,13 +43,12 @@ const vlogContentPrompt = ai.definePrompt({
   output: {schema: z.object({
       vlogTitle: z.string().describe("The title of the generated vlog."),
       vlogDescription: z.string().describe("A short description of the vlog."),
-      visualSummaryImage: z.string().describe("A prompt for an image generation model to create a visual summary of the vlog content."),
-      narrationAudioScript: z.string().describe("The script for the narration audio.")
+      videoPrompt: z.string().describe("A detailed prompt for a video generation model to create a visual summary of the vlog content."),
     })
   },
   prompt: `You are an AI assistant that generates content for automated vlogs of local areas.
 
-  Based on the location and trending topics, create a compelling vlog title, description, a prompt for an image generation AI, and a narration audio script.
+  Based on the location and trending topics, create a compelling vlog title, description, and a video generation prompt.
 
   Location: {{{location}}}
   Trending Topics: {{{trendingTopics}}}
@@ -62,10 +56,9 @@ const vlogContentPrompt = ai.definePrompt({
   Instructions:
   1.  Come up with a vlog title that captures the essence of the location and trending topics.
   2.  Write a concise vlog description (around 50 words) summarizing the content.
-  3.  Compose a narration script (around 100 words) to guide the visual summary and provide context to viewers.
-  4.  Create a detailed prompt for an image generation model that describes the overall theme and objects for a visual summary image.
+  3.  Create a detailed prompt for a video generation model. The prompt should describe a video, about 5 seconds long, that visually represents the location and trending topics. For example: "A cinematic 5-second video showing [description of scenes related to topics] in [location]."
 
-  Output the vlog title, description, image prompt, and narration script in the required format.
+  Output the vlog title, description, and video prompt in the required format.
   `,
 });
 
@@ -81,76 +74,54 @@ const generateVlogFlow = ai.defineFlow(
     if (!vlogContent) {
       throw new Error('Failed to generate vlog content.');
     }
-
-    // Generate the visual summary image
-    const {media: visualSummaryImage} = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-preview-image-generation',
-      prompt: vlogContent.visualSummaryImage, // Assuming vlogContent.visualSummaryImage contains image generation prompt
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
-      },
-    });
-
-    if (!visualSummaryImage) {
-      throw new Error('Failed to generate visual summary image.');
-    }
-
-    // Generate the narration audio from the narration audio script
-    const {media: narrationAudioMedia} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {voiceName: 'Algenib'},
-          },
+    
+    let { operation } = await ai.generate({
+        model: googleAI.model('veo-2.0-generate-001'),
+        prompt: vlogContent.videoPrompt,
+        config: {
+          durationSeconds: 5,
+          aspectRatio: '16:9',
         },
-      },
-      prompt: vlogContent.narrationAudioScript,
-    });
+      });
 
-    if (!narrationAudioMedia) {
-      throw new Error('Failed to generate narration audio.');
-    }
+      if (!operation) {
+        throw new Error('Expected the model to return an operation');
+      }
 
-    const audioBuffer = Buffer.from(
-      narrationAudioMedia.url.substring(narrationAudioMedia.url.indexOf(',') + 1),
-      'base64'
-    );
-    const narrationAudio = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+      // Wait until the operation completes.
+      while (!operation.done) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        operation = await ai.checkOperation(operation);
+      }
+
+      if (operation.error) {
+        throw new Error('failed to generate video: ' + operation.error.message);
+      }
+
+      const video = operation.output?.message?.content.find((p) => !!p.media);
+      if (!video || !video.media) {
+        throw new Error('Failed to find the generated video');
+      }
+
+      const fetch = (await import('node-fetch')).default;
+      const videoDownloadResponse = await fetch(
+        `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
+      );
+      if (
+        !videoDownloadResponse ||
+        videoDownloadResponse.status !== 200 ||
+        !videoDownloadResponse.body
+      ) {
+        throw new Error('Failed to fetch video');
+      }
+      
+      const videoBuffer = await videoDownloadResponse.arrayBuffer();
+      const base64Video = Buffer.from(videoBuffer).toString('base64');
 
     return {
       vlogTitle: vlogContent.vlogTitle,
       vlogDescription: vlogContent.vlogDescription,
-      visualSummaryImage: visualSummaryImage.url,
-      narrationAudio,
+      vlogVideo: `data:video/mp4;base64,${base64Video}`,
     };
   }
 );
-
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    let bufs = [] as any[];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}

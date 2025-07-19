@@ -1,10 +1,10 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { generateVlog, type GenerateVlogOutput } from "@/ai/flows/automated-vlog-generation";
-import { Loader2, Wand2 } from "lucide-react";
+import { Loader2, Wand2, Film } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object({
@@ -53,7 +53,7 @@ export function VlogGeneratorClient() {
       const result = await generateVlog(values);
       setVlogData(result);
     } catch (err) {
-      setError("Failed to generate vlog. Please try again.");
+      setError("Failed to generate vlog. This can take a minute, please try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -66,7 +66,7 @@ export function VlogGeneratorClient() {
         <CardHeader>
           <CardTitle>Generate Area Vlog</CardTitle>
           <CardDescription>
-            Create an automated visual summary for any location.
+            Create an automated video summary for any location.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -109,7 +109,7 @@ export function VlogGeneratorClient() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
+                    Generating Video...
                   </>
                 ) : (
                   <>
@@ -127,29 +127,36 @@ export function VlogGeneratorClient() {
         <Card>
           <CardHeader>
             <CardTitle>Generated Vlog</CardTitle>
-            <CardDescription>Your AI-generated content will appear here.</CardDescription>
+            <CardDescription>Your AI-generated video will appear here.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading && (
               <div className="space-y-4">
-                <Skeleton className="h-48 w-full" />
+                <div className="flex flex-col items-center justify-center bg-muted aspect-video rounded-lg">
+                    <Film className="w-12 h-12 text-muted-foreground animate-pulse" />
+                    <p className="text-muted-foreground mt-2">Generating video, this may take a moment...</p>
+                </div>
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-10 w-full" />
               </div>
             )}
             {error && <p className="text-destructive">{error}</p>}
             {vlogData && (
               <div className="space-y-4">
-                <div className="relative aspect-video w-full overflow-hidden rounded-lg">
-                  <Image src={vlogData.visualSummaryImage} alt={vlogData.vlogTitle} layout="fill" objectFit="cover" />
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+                  <video src={vlogData.vlogVideo} controls autoPlay loop className="w-full h-full">
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
                 <h3 className="text-xl font-headline font-semibold">{vlogData.vlogTitle}</h3>
                 <p className="text-sm text-muted-foreground">{vlogData.vlogDescription}</p>
-                <audio controls src={vlogData.narrationAudio} className="w-full">
-                  Your browser does not support the audio element.
-                </audio>
+              </div>
+            )}
+             {!isLoading && !vlogData && !error && (
+              <div className="flex flex-col items-center justify-center bg-muted aspect-video rounded-lg">
+                <Film className="w-12 h-12 text-muted-foreground" />
+                <p className="text-muted-foreground mt-2">Your generated video will appear here.</p>
               </div>
             )}
           </CardContent>
