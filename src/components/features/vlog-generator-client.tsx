@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -35,6 +35,8 @@ export function VlogGeneratorClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [vlogData, setVlogData] = useState<GenerateVlogOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,6 +61,37 @@ export function VlogGeneratorClient() {
       setIsLoading(false);
     }
   }
+  
+  useEffect(() => {
+    const video = videoRef.current;
+    const audio = audioRef.current;
+
+    if (video && audio && vlogData) {
+      const playAudio = () => audio.play();
+      const pauseAudio = () => audio.pause();
+      const resetAudio = () => {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+      
+      video.addEventListener('play', playAudio);
+      video.addEventListener('pause', pauseAudio);
+      video.addEventListener('ended', resetAudio);
+      video.addEventListener('seeked', () => {
+        audio.currentTime = video.currentTime;
+      })
+
+      return () => {
+        video.removeEventListener('play', playAudio);
+        video.removeEventListener('pause', pauseAudio);
+        video.removeEventListener('ended', resetAudio);
+        video.removeEventListener('seeked', () => {
+           audio.currentTime = video.currentTime;
+        });
+      };
+    }
+  }, [vlogData]);
+
 
   return (
     <div className="grid md:grid-cols-2 gap-8 items-start">
@@ -145,9 +178,10 @@ export function VlogGeneratorClient() {
             {vlogData && (
               <div className="space-y-4">
                 <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
-                  <video src={vlogData.vlogVideo} controls autoPlay loop className="w-full h-full">
+                  <video ref={videoRef} src={vlogData.vlogVideo} controls loop className="w-full h-full">
                     Your browser does not support the video tag.
                   </video>
+                  <audio ref={audioRef} src={vlogData.vlogAudio} className="hidden" />
                 </div>
                 <h3 className="text-xl font-headline font-semibold">{vlogData.vlogTitle}</h3>
                 <p className="text-sm text-muted-foreground">{vlogData.vlogDescription}</p>
