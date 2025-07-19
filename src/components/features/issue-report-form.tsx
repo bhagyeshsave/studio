@@ -31,7 +31,7 @@ import { Wrapper } from "@googlemaps/react-wrapper";
 import Image from "next/image";
 import { db, storage } from "@/lib/firebase/config";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -48,7 +48,7 @@ const formSchema = z.object({
   location: z.string().min(5, {
     message: "Please provide a location.",
   }),
-  media: z.string().optional(), // Storing as data URI
+  media: z.instanceof(File).optional(),
 });
 
 const render = (status: "loading" | "failure" | "success") => {
@@ -56,14 +56,6 @@ const render = (status: "loading" | "failure" | "success") => {
     if (status === 'failure') return <div>Error loading maps</div>
     return null;
 }
-
-const fileToDataUri = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-});
-
 
 function LocationInput({ field }: { field: any }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -140,21 +132,20 @@ export function IssueReportForm() {
       title: "",
       description: "",
       location: "",
-      media: "",
+      media: undefined,
     },
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if(file.size > 5 * 1024 * 1024) { // 5MB limit
-         toast({ variant: 'destructive', title: "File too large", description: "Please upload a file smaller than 5MB." });
+      if(file.size > 25 * 1024 * 1024) { // 25MB limit
+         toast({ variant: 'destructive', title: "File too large", description: "Please upload a file smaller than 25MB." });
          return;
       }
       try {
-        const dataUri = await fileToDataUri(file);
-        form.setValue("media", dataUri);
-        setPreview(dataUri);
+        form.setValue("media", file);
+        setPreview(URL.createObjectURL(file));
         setFileType(file.type);
       } catch (error) {
         toast({ variant: 'destructive', title: "Error reading file", description: "Could not process the selected file." });
@@ -205,7 +196,7 @@ export function IssueReportForm() {
         // If there's a media file, upload it in the background and update the doc.
         if (values.media) {
             const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
-            const uploadResult = await uploadString(storageRef, values.media, 'data_url');
+            const uploadResult = await uploadBytes(storageRef, values.media);
             const mediaUrl = await getDownloadURL(uploadResult.ref);
             
             // Update the document with the media URL.
@@ -312,7 +303,7 @@ export function IssueReportForm() {
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                         <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
                                         <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                        <p className="text-xs text-muted-foreground">PNG, JPG, MP4 (MAX. 5MB)</p>
+                                        <p className="text-xs text-muted-foreground">PNG, JPG, MP4 (MAX. 25MB)</p>
                                     </div>
                                 )}
                                 <Input id="dropzone-file" type="file" className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
@@ -335,5 +326,3 @@ export function IssueReportForm() {
     </Wrapper>
   );
 }
-
-    
