@@ -87,8 +87,8 @@ export function IssueReportForm() {
       const userId = "anonymous_user"; // In a real app, this would come from auth
       const userName = "Anonymous";
 
-      // 1. Create the document in Firestore first.
-      issueDocRef = await addDoc(collection(db, "issues"), {
+      // 1. Construct the data object explicitly to avoid undefined values.
+      const issueData = {
         title: values.title,
         description: values.description,
         category: values.category,
@@ -102,13 +102,16 @@ export function IssueReportForm() {
         updates: [
           {
             status: "Reported",
-            date: new Date(), // Use client-side date here
+            date: new Date(),
             comment: "Issue submitted by user."
           }
         ]
-      });
+      };
 
-      // 2. Give immediate feedback to the user and reset the form.
+      // 2. Create the document in Firestore first.
+      issueDocRef = await addDoc(collection(db, "issues"), issueData);
+
+      // 3. Give immediate feedback to the user and reset the form.
       toast({
         title: "Issue Reported!",
         description: "Thank you for your submission. Your media is uploading in the background if attached.",
@@ -125,7 +128,7 @@ export function IssueReportForm() {
       return;
     }
 
-    // 3. Handle file upload in the background.
+    // 4. Handle file upload in the background.
     const mediaFile = values.media;
     if (mediaFile && issueDocRef) {
       try {
