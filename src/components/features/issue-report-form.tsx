@@ -83,8 +83,9 @@ export function IssueReportForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     let issueDocRef;
+
     try {
-      const userId = "anonymous_user"; // In a real app, this would come from auth
+      const userId = "anonymous_user";
       const userName = "Anonymous";
 
       const issueData = {
@@ -117,19 +118,21 @@ export function IssueReportForm() {
         title: "Issue Reported!",
         description: "Thank you for your submission. Your media is uploading in the background if attached.",
       });
+
+      // Reset form and UI state immediately
       form.reset();
       setPreview(null);
       setFileType(null);
-      
+      setIsSubmitting(false);
+
     } catch (error) {
       console.error("Error creating Firestore document:", error);
-      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please check the console for details and ensure your Firestore database is set up correctly." });
+      toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please ensure your Firestore database is set up correctly and you have permission to write." });
       setIsSubmitting(false);
       return;
-    } finally {
-      setIsSubmitting(false);
     }
 
+    // Handle media upload in the background
     const mediaFile = values.media;
     if (mediaFile && issueDocRef) {
       try {
