@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -83,11 +83,12 @@ export function IssueReportForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
 
+    let issueDocRef;
     try {
         const userId = "anonymous_user";
         const userName = "Anonymous";
 
-        const issueDocRef = await addDoc(collection(db, "issues"), {
+        issueDocRef = await addDoc(collection(db, "issues"), {
             title: values.title,
             description: values.description,
             category: values.category,
@@ -107,20 +108,29 @@ export function IssueReportForm() {
             ]
         });
 
-        toast({
-            title: "Issue Reported!",
-            description: "Thank you for helping improve our community.",
-        });
-        
-        const mediaFile = values.media;
-        
-        // Reset form and UI state immediately
-        form.reset();
-        setPreview(null);
-        setFileType(null);
+    } catch (error) {
+        console.error("Error creating Firestore document:", error);
+        toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
         setIsSubmitting(false);
+        return; // Stop execution if Firestore fails
+    }
 
-        if (mediaFile) {
+    // Give immediate feedback to the user
+    toast({
+        title: "Issue Reported!",
+        description: "Thank you for helping improve our community. Your media is uploading in the background.",
+    });
+    
+    // Reset form and UI state immediately
+    form.reset();
+    setPreview(null);
+    setFileType(null);
+    setIsSubmitting(false);
+    
+    // Handle file upload in the background
+    const mediaFile = values.media;
+    if (mediaFile && issueDocRef) {
+        try {
             console.log("Starting media upload in background...");
             const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
             const uploadResult = await uploadBytes(storageRef, mediaFile);
@@ -130,12 +140,10 @@ export function IssueReportForm() {
                 imageUrl: mediaUrl
             });
             console.log("Background media upload and document update complete.");
+        } catch(error) {
+            console.error("Background media upload failed:", error);
+            // Optionally, you could add a toast here to inform the user the upload failed
         }
-
-    } catch (error) {
-        console.error("Error submitting issue:", error);
-        toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
-        setIsSubmitting(false);
     }
   }
 
