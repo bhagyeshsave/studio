@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, ShieldCheck, Siren, Trash2, Droplets, Construction, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { ArrowRight, ShieldCheck, Siren, Trash2, Droplets, Construction, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -33,7 +33,6 @@ export default function Dashboard() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [issueStats, setIssueStats] = useState<IssueStats>({ waste: 0, water: 0, roads: 0});
   const [loading, setLoading] = useState(true);
-  const [firebaseError, setFirebaseError] = useState<string | null>(null);
 
   useEffect(() => {
     // Fetch Wards
@@ -42,15 +41,9 @@ export default function Dashboard() {
         const querySnapshot = await getDocs(collection(db, "wards"));
         const wardsData = querySnapshot.docs.map(doc => doc.data() as Ward);
         setWards(wardsData);
-        if (querySnapshot.empty) {
-            setFirebaseError("Connected to Firebase, but 'wards' collection is empty or does not exist.");
-        } else {
-            setFirebaseError(null);
-        }
       } catch (error) {
         console.error("Error fetching wards:", error);
         toast({ variant: "destructive", title: "Firebase Connection Error", description: "Could not fetch ward data. Check your Firebase setup and permissions." });
-        setFirebaseError("Failed to connect to Firebase. Please check your configuration and security rules.");
       }
     };
 
@@ -76,7 +69,6 @@ export default function Dashboard() {
     }, (error) => {
         console.error("Error fetching issue stats:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not fetch issue statistics." });
-        // Don't set the main firebaseError here, as the wards check is the primary test
     });
 
     const loadData = async () => {
@@ -100,25 +92,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-       <Card>
-        <CardHeader>
-            <CardTitle>Firebase Connection Test</CardTitle>
-        </CardHeader>
-        <CardContent>
-            {firebaseError ? (
-                <div className="flex items-center gap-2 text-destructive">
-                    <XCircle className="w-5 h-5"/>
-                    <p>{firebaseError}</p>
-                </div>
-            ) : (
-                <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle className="w-5 h-5"/>
-                    <p>Successfully connected to Firebase and fetched data.</p>
-                </div>
-            )}
-        </CardContent>
-       </Card>
-
       <section>
         <h2 className="text-3xl font-headline font-semibold tracking-tight mb-4">Community Scorecard</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
