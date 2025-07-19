@@ -82,8 +82,7 @@ export function IssueReportForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    let issueDocRef;
-
+    
     const issueData = {
         title: values.title,
         description: values.description,
@@ -91,8 +90,8 @@ export function IssueReportForm() {
         location: values.location,
         imageUrl: "",
         status: "Reported",
-        reporterId: "anonymous_user",
-        reporter: "Anonymous",
+        reporterId: "anonymous_user", // Replace with actual user ID in a real app
+        reporter: "Anonymous", // Replace with actual user name
         reportedAt: serverTimestamp(),
         upvotes: 0,
         updates: [
@@ -105,18 +104,24 @@ export function IssueReportForm() {
     };
 
     try {
-      console.log("Attempting to submit the following data to Firestore:", issueData);
-
-      issueDocRef = await addDoc(collection(db, "issues"), issueData);
+      const issueDocRef = await addDoc(collection(db, "issues"), issueData);
       
-      console.log("Document successfully created with ID:", issueDocRef.id);
-
       toast({
         title: "Issue Reported!",
-        description: "Thank you for your submission. Your media is uploading in the background if attached.",
+        description: "Thank you for your submission. Your issue has been logged.",
       });
 
-      // Reset form and UI state immediately
+      // Background media upload
+      const mediaFile = values.media;
+      if (mediaFile) {
+        const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
+        uploadBytes(storageRef, mediaFile).then(uploadResult => {
+            getDownloadURL(uploadResult.ref).then(mediaUrl => {
+                updateDoc(doc(db, "issues", issueDocRef.id), { imageUrl: mediaUrl });
+            });
+        });
+      }
+      
       form.reset();
       setPreview(null);
       setFileType(null);
@@ -126,35 +131,10 @@ export function IssueReportForm() {
       toast({ 
         variant: 'destructive', 
         title: "Submission Failed", 
-        description: "Could not submit your issue. Please check your Firebase project configuration and ensure the Firestore API is enabled." 
+        description: "Could not submit your issue. Please check your project's Firestore configuration and ensure it is enabled."
       });
-      setIsSubmitting(false);
-      return;
     } finally {
         setIsSubmitting(false);
-    }
-
-    // Handle media upload in the background
-    const mediaFile = values.media;
-    if (mediaFile && issueDocRef) {
-      try {
-        console.log("Starting background media upload...");
-        const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
-        const uploadResult = await uploadBytes(storageRef, mediaFile);
-        const mediaUrl = await getDownloadURL(uploadResult.ref);
-
-        await updateDoc(doc(db, "issues", issueDocRef.id), {
-            imageUrl: mediaUrl
-        });
-        console.log("Background media upload and document update complete.");
-      } catch (uploadError) {
-        console.error("Background media upload failed:", uploadError);
-        toast({
-          variant: 'destructive',
-          title: "Media Upload Failed",
-          description: "Your issue was reported, but the attached media failed to upload."
-        });
-      }
     }
   }
 
