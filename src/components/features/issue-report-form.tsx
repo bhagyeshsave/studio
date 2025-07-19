@@ -28,9 +28,6 @@ import { toast } from "@/hooks/use-toast";
 import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
 import Image from "next/image";
-import { db, storage } from "@/lib/firebase/config";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -83,59 +80,21 @@ export function IssueReportForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    const issueData = {
-        title: values.title,
-        description: values.description,
-        category: values.category,
-        location: values.location,
-        imageUrl: "",
-        status: "Reported",
-        reporterId: "anonymous_user", // Replace with actual user ID in a real app
-        reporter: "Anonymous", // Replace with actual user name
-        reportedAt: serverTimestamp(),
-        upvotes: 0,
-        updates: [
-          {
-            status: "Reported",
-            date: new Date(),
-            comment: "Issue submitted by user."
-          }
-        ]
-    };
+    // Log the data to the console since there is no backend
+    console.log("Form submitted. No backend connected.", values);
 
-    try {
-      const issueDocRef = await addDoc(collection(db, "issues"), issueData);
-      
-      toast({
-        title: "Issue Reported!",
-        description: "Thank you for your submission. Your issue has been logged.",
-      });
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    toast({
+      title: "Issue Reported (Simulated)!",
+      description: "Thank you for your submission. Your issue has been logged to the console.",
+    });
 
-      // Background media upload
-      const mediaFile = values.media;
-      if (mediaFile) {
-        const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
-        uploadBytes(storageRef, mediaFile).then(uploadResult => {
-            getDownloadURL(uploadResult.ref).then(mediaUrl => {
-                updateDoc(doc(db, "issues", issueDocRef.id), { imageUrl: mediaUrl });
-            });
-        });
-      }
-      
-      form.reset();
-      setPreview(null);
-      setFileType(null);
-
-    } catch (error) {
-      console.error("Error creating Firestore document:", error);
-      toast({ 
-        variant: 'destructive', 
-        title: "Submission Failed", 
-        description: "Could not submit your issue. Please check your project's Firestore configuration and ensure it is enabled."
-      });
-    } finally {
-        setIsSubmitting(false);
-    }
+    form.reset();
+    setPreview(null);
+    setFileType(null);
+    setIsSubmitting(false);
   }
 
   return (

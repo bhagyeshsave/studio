@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { civicChatbot } from "@/ai/flows/civic-chatbot";
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { toast } from "@/hooks/use-toast";
 
 
@@ -18,76 +16,43 @@ interface Message {
   id: string;
   text: string;
   sender: "user" | "bot";
-  timestamp?: any;
 }
 
 export function ChatbotClient() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+        id: "1",
+        text: "Hello! I'm your civic assistant. Ask me about safety ratings or local trends in your area.",
+        sender: "bot",
+    },
+  ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [chatId, setChatId] = useState<string | null>(null);
-
-  useEffect(() => {
-    // For simplicity, we'll use one chat session. In a real app, you'd manage multiple chat sessions.
-    const hardcodedChatId = "global_chat";
-    setChatId(hardcodedChatId);
-
-    const messagesCol = collection(db, "chats", hardcodedChatId, "messages");
-    const q = query(messagesCol, orderBy("timestamp", "asc"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-        if (fetchedMessages.length === 0) {
-             setMessages([
-                {
-                    id: "1",
-                    text: "Hello! I'm your civic assistant. Ask me about safety ratings or local trends in your area.",
-                    sender: "bot",
-                },
-            ]);
-        } else {
-            setMessages(fetchedMessages);
-        }
-    }, (error) => {
-        console.error("Error fetching chat history:", error);
-        toast({variant: 'destructive', title: 'Error', description: 'Could not load chat history.'});
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || !chatId) return;
+    if (!input.trim() || isLoading) return;
 
-    const userMessage: Omit<Message, 'id' | 'timestamp'> = {
+    const userMessage: Message = {
+      id: (Date.now()).toString(),
       text: input,
       sender: "user",
     };
     
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
-      const messagesCol = collection(db, "chats", chatId, "messages");
-      // Add user message to Firestore
-      await addDoc(messagesCol, {
-          ...userMessage,
-          timestamp: serverTimestamp(),
-      });
-
       const result = await civicChatbot({ query: input });
-      const botMessage: Omit<Message, 'id' | 'timestamp'> = {
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
         text: result.answer,
         sender: "bot",
       };
 
-      // Add bot message to Firestore
-      await addDoc(messagesCol, {
-          ...botMessage,
-          timestamp: serverTimestamp(),
-      });
+      setMessages((prev) => [...prev, botMessage]);
 
     } catch (error) {
       console.error("Error sending message:", error);
@@ -97,6 +62,7 @@ export function ChatbotClient() {
         sender: "bot",
       };
       setMessages((prev) => [...prev, errorMessage]);
+       toast({variant: 'destructive', title: 'Error', description: 'Could not connect to the chatbot.'});
     } finally {
       setIsLoading(false);
     }

@@ -9,9 +9,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ThumbsUp, MessageSquare, ListFilter, MapPin, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, getDocs, onSnapshot, query, orderBy, where, doc, updateDoc, increment } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { toast } from "@/hooks/use-toast";
+import { issues as mockIssues } from "@/data/mock-data";
 
 interface Issue {
     id: string;
@@ -19,10 +18,7 @@ interface Issue {
     status: string;
     location: string;
     reporter: string;
-    reportedAt: {
-        seconds: number;
-        nanoseconds: number;
-    };
+    reportedAt: Date;
     imageUrl: string;
     imageHint: string;
     upvotes: number;
@@ -33,31 +29,21 @@ export default function IssuesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "issues"), orderBy("reportedAt", "desc"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const issuesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Issue));
-      setIssues(issuesData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching issues:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch issues.' });
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    // Simulate fetching data
+    setTimeout(() => {
+        setIssues(mockIssues);
+        setLoading(false);
+    }, 1000);
   }, []);
 
-  const handleUpvote = async (issueId: string) => {
-    const issueRef = doc(db, "issues", issueId);
-    try {
-      await updateDoc(issueRef, {
-        upvotes: increment(1)
-      });
-      toast({ title: 'Success', description: 'You have upvoted this issue.' });
-    } catch (error) {
-      console.error("Error upvoting issue:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not upvote the issue.' });
-    }
+  const handleUpvote = (issueId: string) => {
+     // Mock upvoting
+    setIssues(prevIssues => 
+        prevIssues.map(issue => 
+            issue.id === issueId ? { ...issue, upvotes: issue.upvotes + 1 } : issue
+        )
+    );
+    toast({ title: 'Success', description: 'You have upvoted this issue.' });
   };
 
 
@@ -93,7 +79,7 @@ export default function IssuesPage() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1">
                 <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">Filter</span>
+                <span className="sr-only sm:not-sr-only sm:whitespace-rap">Filter</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -132,7 +118,7 @@ export default function IssuesPage() {
                         <p className="text-sm text-muted-foreground flex items-center gap-2"><MapPin className="w-4 h-4"/> {issue.location}</p>
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
                             <span>By {issue.reporter === 'anonymous' ? 'Anonymous' : issue.reporter}</span>
-                            <span>{new Date(issue.reportedAt.seconds * 1000).toLocaleDateString()}</span>
+                            <span>{issue.reportedAt.toLocaleDateString()}</span>
                         </div>
                         <div className="flex gap-2 pt-2">
                             <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => handleUpvote(issue.id)}>

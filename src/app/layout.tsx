@@ -8,7 +8,6 @@ import { AppSidebar } from "@/components/shared/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { AppHeader } from "@/components/shared/app-header";
 import { Toaster } from "@/components/ui/toaster";
-import { FirebaseMessagingProvider } from "@/components/features/firebase-messaging-provider";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -39,20 +38,18 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className={cn("min-h-screen bg-background font-body antialiased", poppins.variable, ptSans.variable)}>
-        <FirebaseMessagingProvider>
-            <SidebarProvider>
-            <div className="flex">
-                <AppSidebar />
-                <SidebarInset className="min-h-screen !m-0 !p-0 !rounded-none !shadow-none">
-                <AppHeader />
-                <main className="p-4 sm:p-6 lg:p-8">
-                    {children}
-                </main>
-                </SidebarInset>
-            </div>
-            </SidebarProvider>
-            <Toaster />
-        </FirebaseMessagingProvider>
+        <SidebarProvider>
+        <div className="flex">
+            <AppSidebar />
+            <SidebarInset className="min-h-screen !m-0 !p-0 !rounded-none !shadow-none">
+            <AppHeader />
+            <main className="p-4 sm:p-6 lg:p-8">
+                {children}
+            </main>
+            </SidebarInset>
+        </div>
+        </SidebarProvider>
+        <Toaster />
       </body>
     </html>
   );

@@ -11,13 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Clock, FileWarning, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { toast } from "@/hooks/use-toast";
+import { issues as mockIssues } from "@/data/mock-data";
 
 interface Update {
     status: string;
-    date: { seconds: number; nanoseconds: number; };
+    date: Date;
     comment: string;
 }
 
@@ -25,7 +24,7 @@ interface Issue {
   id: string;
   title: string;
   status: string;
-  reportedAt: { seconds: number; nanoseconds: number; };
+  reportedAt: Date;
   updates: Update[];
   resolutionUrl?: string;
   resolutionHint?: string;
@@ -61,28 +60,16 @@ const getStatusVariant = (status: string) => {
 export default function TrackingPage() {
   const [userIssues, setUserIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  // Hardcoding user for now, this should come from auth
-  const userId = "anonymous_user"; 
-
+  
   useEffect(() => {
-    const q = query(
-        collection(db, "issues"),
-        where("reporterId", "==", userId),
-        orderBy("reportedAt", "desc")
-    );
+    // Simulate fetching user-specific issues
+    setTimeout(() => {
+        // We'll just show all mock issues for demonstration
+        setUserIssues(mockIssues);
+        setLoading(false);
+    }, 1000)
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const issuesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Issue));
-      setUserIssues(issuesData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching user issues:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch your reported issues.' });
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [userId]);
+  }, []);
 
 
   return (
@@ -108,7 +95,7 @@ export default function TrackingPage() {
                                 <div>
                                     <p className="font-semibold text-left">{issue.title}</p>
                                     <p className="text-sm text-muted-foreground text-left">
-                                    ID: {issue.id.substring(0, 6)}... • Reported on {new Date(issue.reportedAt.seconds * 1000).toLocaleDateString()}
+                                    ID: {issue.id.substring(0, 6)}... • Reported on {issue.reportedAt.toLocaleDateString()}
                                     </p>
                                 </div>
                             </div>
@@ -120,14 +107,14 @@ export default function TrackingPage() {
                             <div>
                                 <h4 className="font-semibold mb-2">Timeline</h4>
                                 <ol className="relative border-l border-border ml-2">                  
-                                    {issue.updates.sort((a,b) => b.date.seconds - a.date.seconds).map((update, index) => (
+                                    {issue.updates.sort((a,b) => b.date.getTime() - a.date.getTime()).map((update, index) => (
                                         <li key={index} className="mb-6 ml-6">            
                                             <span className="absolute flex items-center justify-center w-6 h-6 bg-secondary rounded-full -left-3 ring-8 ring-background">
                                                 {getStatusIcon(update.status)}
                                             </span>
                                             <div className="p-4 bg-muted/50 rounded-lg border">
                                                 <h5 className="flex items-center mb-1 text-base font-semibold">{update.status}</h5>
-                                                <time className="block mb-2 text-xs font-normal leading-none text-muted-foreground">{new Date(update.date.seconds * 1000).toLocaleString()}</time>
+                                                <time className="block mb-2 text-xs font-normal leading-none text-muted-foreground">{update.date.toLocaleString()}</time>
                                                 <p className="text-sm font-normal">{update.comment}</p>
                                             </div>
                                         </li>

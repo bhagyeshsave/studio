@@ -9,10 +9,8 @@ import { ArrowRight, ShieldCheck, Siren, Trash2, Droplets, Construction, Loader2
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs, onSnapshot, query } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { toast } from "@/hooks/use-toast";
-import { communityData } from "@/data/mock-data"; // Keep campaigns for now
+import { communityData } from "@/data/mock-data"; 
 
 interface Ward {
   name: string;
@@ -31,55 +29,20 @@ interface IssueStats {
 
 export default function Dashboard() {
   const [wards, setWards] = useState<Ward[]>([]);
-  const [issueStats, setIssueStats] = useState<IssueStats>({ waste: 0, water: 0, roads: 0});
+  const [issueStats, setIssueStats] = useState<IssueStats>({ waste: 12, water: 5, roads: 8});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch Wards
-    const fetchWards = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "wards"));
-        const wardsData = querySnapshot.docs.map(doc => doc.data() as Ward);
-        setWards(wardsData);
-      } catch (error) {
-        console.error("Error fetching wards:", error);
-        toast({ variant: "destructive", title: "Firebase Connection Error", description: "Could not fetch ward data. Check your Firebase setup and permissions." });
-      }
-    };
-
-    // Fetch and listen to Issues for stats
-    const q = query(collection(db, "issues"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const stats: IssueStats = { waste: 0, water: 0, roads: 0 };
-        querySnapshot.forEach((doc) => {
-            const issue = doc.data();
-            switch (issue.category) {
-                case "Waste Management":
-                    stats.waste++;
-                    break;
-                case "Water and Sewage":
-                    stats.water++;
-                    break;
-                case "Roads and Infrastructure":
-                    stats.roads++;
-                    break;
-            }
-        });
-        setIssueStats(stats);
-    }, (error) => {
-        console.error("Error fetching issue stats:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not fetch issue statistics." });
-    });
-
+    // Simulate fetching data
     const loadData = async () => {
         setLoading(true);
-        await fetchWards();
-        setLoading(false);
+        setTimeout(() => {
+            setWards(communityData.wards);
+            setLoading(false);
+        }, 1000)
     }
 
     loadData();
-
-    return () => unsubscribe();
   }, []);
 
   if (loading) {

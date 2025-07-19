@@ -7,9 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Crown, Medal, Award, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { toast } from "@/hooks/use-toast";
+import { leaderboardData as mockLeaderboard } from "@/data/mock-data";
 
 interface User {
     rank: number;
@@ -31,24 +30,11 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const q = query(collection(db, "users"), orderBy("points", "desc"));
-        const querySnapshot = await getDocs(q);
-        const users = querySnapshot.docs.map((doc, index) => ({
-          id: doc.id,
-          rank: index + 1,
-          ...doc.data()
-        } as unknown as User));
-        setLeaderboardData(users);
-      } catch (error) {
-        console.error("Error fetching leaderboard data:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch leaderboard data.' });
-      } finally {
+    // Simulate fetching data
+    setTimeout(() => {
+        setLeaderboardData(mockLeaderboard);
         setLoading(false);
-      }
-    };
-    fetchLeaderboard();
+    }, 1000);
   }, []);
 
   return (
