@@ -30,7 +30,7 @@ import { issueCategories } from "@/data/mock-data";
 import { Wrapper } from "@googlemaps/react-wrapper";
 import Image from "next/image";
 import { db, storage } from "@/lib/firebase/config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -165,25 +165,19 @@ export function IssueReportForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    let mediaUrl = "";
 
     try {
-        if(values.media) {
-            const storageRef = ref(storage, `issues/${uuidv4()}`);
-            const uploadResult = await uploadString(storageRef, values.media, 'data_url');
-            mediaUrl = await getDownloadURL(uploadResult.ref);
-        }
-
         // Hardcoding user for now, in a real app this would come from an auth context
         const userId = "anonymous_user";
         const userName = "Anonymous";
 
-        await addDoc(collection(db, "issues"), {
+        // Create the issue document in Firestore first.
+        const issueDocRef = await addDoc(collection(db, "issues"), {
             title: values.title,
             description: values.description,
             category: values.category,
             location: values.location,
-            imageUrl: mediaUrl,
+            imageUrl: "", // Initially empty
             status: "Reported",
             reporterId: userId,
             reporter: userName,
@@ -198,17 +192,32 @@ export function IssueReportForm() {
             ]
         });
 
+        // The form is now "submitted" from the user's perspective.
         toast({
             title: "Issue Reported!",
-            description: "Thank you for helping improve our community.",
+            description: "Thank you for helping improve our community. Your media is being uploaded.",
         });
         form.reset();
         setPreview(null);
         setFileType(null);
+        setIsSubmitting(false);
+
+        // If there's a media file, upload it in the background and update the doc.
+        if (values.media) {
+            const storageRef = ref(storage, `issues/${issueDocRef.id}/${uuidv4()}`);
+            const uploadResult = await uploadString(storageRef, values.media, 'data_url');
+            const mediaUrl = await getDownloadURL(uploadResult.ref);
+            
+            // Update the document with the media URL.
+            await updateDoc(doc(db, "issues", issueDocRef.id), {
+                imageUrl: mediaUrl
+            });
+            console.log("Media uploaded and document updated successfully.");
+        }
+
     } catch (error) {
         console.error("Error submitting issue:", error);
         toast({ variant: 'destructive', title: "Submission Failed", description: "Could not submit your issue. Please try again." });
-    } finally {
         setIsSubmitting(false);
     }
   }
@@ -326,3 +335,5 @@ export function IssueReportForm() {
     </Wrapper>
   );
 }
+
+    
