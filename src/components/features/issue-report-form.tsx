@@ -24,12 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
 import Image from "next/image";
 import { v4 as uuidv4 } from 'uuid';
-
+import { db, storage } from "@/lib/firebase/config";
+import { addDoc, collection, serverTimestamp, query, where, getDocs, writeBatch, increment } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -52,6 +54,7 @@ export function IssueReportForm() {
   const [preview, setPreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -80,21 +83,102 @@ export function IssueReportForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
-    // Log the data to the console since there is no backend
-    console.log("Form submitted. No backend connected.", values);
+    // This is a mock user. In a real app, this would come from an auth context.
+    const mockUser = {
+        id: 'user_12345',
+        name: 'Anonymous' 
+    };
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Issue Reported (Simulated)!",
-      description: "Thank you for your submission. Your issue has been logged to the console.",
-    });
+    try {
+        let mediaUrl: string | undefined = undefined;
+        // 1. If there's a file, upload it to Firebase Storage
+        if (values.media) {
+            const file = values.media;
+            const storageRef = ref(storage, `issues/${uuidv4()}-${file.name}`);
+            const uploadResult = await uploadBytes(storageRef, file);
+            mediaUrl = await getDownloadURL(uploadResult.ref);
+        }
 
-    form.reset();
-    setPreview(null);
-    setFileType(null);
-    setIsSubmitting(false);
+        const reportsCollection = collection(db, "issueReports");
+        const issuesCollection = collection(db, "issues");
+
+        // 2. Always create a report in `issueReports`
+        const newReport = {
+            title: values.title,
+            description: values.description,
+            category: values.category,
+            location: values.location,
+            reporterId: mockUser.id,
+            reporterName: mockUser.name,
+            createdAt: serverTimestamp(),
+            ...(mediaUrl && { mediaUrl }),
+        };
+        const reportDocRef = await addDoc(reportsCollection, newReport);
+
+        // 3. Check for an existing, non-resolved issue
+        const q = query(issuesCollection, 
+            where("category", "==", values.category),
+            where("location", "==", values.location),
+            where("status", "!=", "Resolved")
+        );
+        const querySnapshot = await getDocs(q);
+
+        const batch = writeBatch(db);
+
+        if (querySnapshot.empty) {
+            // 4a. If no similar issue exists, create a new canonical issue
+            const newIssueDocRef = collection(db, "issues"); // Ref for a new doc
+            const newIssueData = {
+                title: values.title,
+                description: values.description,
+                category: values.category,
+                location: values.location,
+                reporterId: mockUser.id,
+                reporterName: mockUser.name,
+                status: 'Reported' as const,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                upvotes: 0,
+                reportCount: 1,
+                 ...(mediaUrl && { mediaUrl }),
+            };
+            const issueDocRef = await addDoc(newIssueDocRef, newIssueData);
+            
+            // Link the report to the new canonical issue
+            batch.update(reportDocRef, { linkedIssueId: issueDocRef.id });
+
+        } else {
+            // 4b. If a similar issue exists, update its report count
+            const existingIssueDoc = querySnapshot.docs[0];
+            batch.update(existingIssueDoc.ref, { 
+                reportCount: increment(1),
+                updatedAt: serverTimestamp(),
+            });
+             // Link the report to the existing canonical issue
+             batch.update(reportDocRef, { linkedIssueId: existingIssueDoc.id });
+        }
+        
+        await batch.commit();
+
+        toast({
+            title: "Issue Reported Successfully!",
+            description: "Thank you for your submission. Your report has been logged.",
+        });
+
+        form.reset();
+        setPreview(null);
+        setFileType(null);
+
+    } catch (error) {
+        console.error("Error submitting issue: ", error);
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: "There was an error submitting your issue. Please try again.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (

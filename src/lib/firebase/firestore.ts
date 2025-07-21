@@ -1,6 +1,6 @@
 
 import { db } from './config';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, serverTimestamp, writeBatch, documentId } from 'firebase/firestore';
 
 // Types to match the database structure
 
@@ -13,7 +13,7 @@ export interface UserProfile {
 }
 
 export interface Issue {
-  id: string;
+  id:string;
   title: string;
   description: string;
   category: string;
@@ -21,12 +21,28 @@ export interface Issue {
   reporterId: string;
   reporterName: string;
   status: 'Reported' | 'In Progress' | 'Resolved';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
   upvotes: number;
+  reportCount: number;
   mediaUrl?: string;
   resolutionMediaUrl?: string;
 }
+
+// Every time a user reports an issue, it creates one of these.
+export interface IssueReport {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    location: string;
+    reporterId: string;
+    reporterName: string;
+    createdAt: any; // Firestore Timestamp
+    mediaUrl?: string;
+    linkedIssueId?: string; // ID of the canonical issue in the `issues` collection
+}
+
 
 export interface Ward {
   id: string; // ward number as string
