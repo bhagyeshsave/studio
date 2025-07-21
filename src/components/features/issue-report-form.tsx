@@ -28,22 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
 import Image from "next/image";
-
-const formSchema = z.object({
-  title: z.string().min(5, {
-    message: "Title must be at least 5 characters.",
-  }),
-  description: z.string().min(10, {
-    message: "Description must be at least 10 characters.",
-  }),
-  category: z.string({
-    required_error: "Please select an issue category.",
-  }),
-  location: z.string().min(5, {
-    message: "Please provide a location.",
-  }),
-  media: z.instanceof(File).optional(),
-});
+import { addIssue } from "@/lib/firebase/firestore";
+import { issueSchema } from "@/data/schemas";
 
 
 export function IssueReportForm() {
@@ -52,11 +38,12 @@ export function IssueReportForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof issueSchema>>({
+    resolver: zodResolver(issueSchema),
     defaultValues: {
       title: "",
       description: "",
+      category: "",
       location: "",
       media: undefined,
     },
@@ -76,23 +63,29 @@ export function IssueReportForm() {
   };
 
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof issueSchema>) {
     setIsSubmitting(true);
-    
-    // Simulate submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const { media, ...issueData } = values;
 
-    console.log("Form submitted. No database connected. Data: ", values);
-    
-    toast({
-        title: "Submission Simulated!",
-        description: "In a real app, this would be sent to a database.",
-    });
-
-    form.reset();
-    setPreview(null);
-    setFileType(null);
-    setIsSubmitting(false);
+    try {
+      await addIssue(issueData, media);
+      toast({
+        title: "Issue Reported!",
+        description: "Thank you for helping improve your community.",
+      });
+      form.reset();
+      setPreview(null);
+      setFileType(null);
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: (error as Error).message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
