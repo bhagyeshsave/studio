@@ -1,46 +1,26 @@
 
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { v4 as uuidv4 } from "uuid";
 import type { z } from "zod";
-import { db, storage } from "./config";
+import { db } from "./config";
 import type { issueSchema } from "@/data/schemas";
 
-type IssueInput = z.infer<typeof issueSchema>;
+// Note: This is a simplified schema for adding an issue.
+// The full Issue schema will be more complex.
+type IssueInput = Omit<z.infer<typeof issueSchema>, 'media'>;
 
 /**
  * Adds a new issue to Firestore. File upload is temporarily disabled for debugging.
- * @param issueData - The data for the issue.
- * @param mediaFile - The optional media file (image/video). Currently not uploaded.
+ * @param issueData - The data for the issue (without media).
  * @returns The ID of the newly created issue document.
  */
 export async function addIssue(
-  issueData: IssueInput,
-  mediaFile?: File
+  issueData: IssueInput
 ): Promise<string> {
-  let mediaUrl = "";
-
-  // 1. Upload media if it exists - TEMPORARILY DISABLED
-  if (mediaFile) {
-    console.log("File selected, but upload is temporarily disabled for debugging.");
-    // const fileExtension = mediaFile.name.split(".").pop();
-    // const fileName = `issues/${uuidv4()}.${fileExtension}`;
-    // const storageRef = ref(storage, fileName);
-
-    // try {
-    //   const snapshot = await uploadBytes(storageRef, mediaFile);
-    //   mediaUrl = await getDownloadURL(snapshot.ref);
-    // } catch (error) {
-    //   console.error("Error uploading file:", error);
-    //   throw new Error("File upload failed. Please try again.");
-    // }
-  }
-
-  // 2. Add issue document to Firestore
+  // 1. Add issue document to Firestore
   try {
     console.log("Attempting to write the following data to Firestore:", {
       ...issueData,
-      imageUrl: mediaUrl, // Will be empty for now
+      imageUrl: "", // Will be empty for now
       status: "Reported",
       upvotes: 0,
       // reportedAt will be set by the server
@@ -48,7 +28,7 @@ export async function addIssue(
 
     const docRef = await addDoc(collection(db, "issues"), {
       ...issueData,
-      imageUrl: mediaUrl,
+      imageUrl: "", // Media is disabled
       status: "Reported",
       reportedAt: serverTimestamp(),
       upvotes: 0,
