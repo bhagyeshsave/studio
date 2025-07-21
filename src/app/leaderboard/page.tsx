@@ -7,16 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Crown, Medal, Award, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "@/hooks/use-toast";
-import { leaderboardData as mockLeaderboard } from "@/data/mock-data";
+import { leaderboardData as mockLeaderboard, User } from "@/data/mock-data";
 
-interface User {
-    rank: number;
-    user: string;
-    points: number;
-    avatar: string;
-    badges: string[];
-}
 
 const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-yellow-500" />;
@@ -34,7 +26,7 @@ export default function LeaderboardPage() {
     setTimeout(() => {
         setLeaderboardData(mockLeaderboard);
         setLoading(false);
-    }, 1000);
+    }, 500);
   }, []);
 
   return (

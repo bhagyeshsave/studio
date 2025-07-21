@@ -1,4 +1,22 @@
 
+export interface Ward {
+  name: string;
+  wardNumber: number;
+  hygieneRating: number;
+  safetyRating: number;
+  issuesResolved: number;
+  openIssues: number;
+}
+
+export interface Campaign {
+  title: string;
+  description: string;
+  imageUrl: string;
+  imageHint: string;
+  status: "Active" | "Upcoming" | "Completed";
+  date: string;
+}
+
 export const communityData = {
   wards: [
     {
@@ -25,7 +43,7 @@ export const communityData = {
       issuesResolved: 210,
       openIssues: 8,
     },
-  ],
+  ] as Ward[],
   campaigns: [
     {
       title: "City-Wide Cleanup Drive",
@@ -43,7 +61,7 @@ export const communityData = {
       status: "Upcoming",
       date: "Nov 5-11, 2023",
     },
-  ],
+  ] as Campaign[],
 };
 
 export const issueCategories = [
@@ -56,7 +74,28 @@ export const issueCategories = [
   "Other",
 ];
 
-export const issues = [
+export interface Update {
+    status: string;
+    date: Date;
+    comment: string;
+}
+
+export interface Issue {
+  id: string;
+  title: string;
+  status: "Reported" | "In Progress" | "Resolved";
+  location: string;
+  reporter: string;
+  reportedAt: Date;
+  imageUrl: string;
+  imageHint: string;
+  upvotes: number;
+  updates: Update[];
+  resolutionUrl?: string;
+  resolutionHint?: string;
+}
+
+export const issues: Issue[] = [
   {
       id: "1",
       title: "Overflowing garbage can at park entrance",
@@ -106,10 +145,20 @@ export const issues = [
   }
 ];
 
-export const leaderboardData = [
+export interface User {
+    rank: number;
+    user: string;
+    points: number;
+    avatar: string;
+    badges: string[];
+}
+
+
+export const leaderboardData: User[] = [
   { rank: 1, user: 'CommunityHero', points: 1250, avatar: 'https://placehold.co/100x100.png', badges: ['Top Reporter', 'Validator'] },
   { rank: 2, user: 'CivicSavior', points: 1100, avatar: 'https://placehold.co/100x100.png', badges: ['Clean-up Crew'] },
   { rank: 3, user: 'FixerUpper', points: 980, avatar: 'https://placehold.co/100x100.png', badges: ['Validator'] },
   { rank: 4, user: 'GreenGuardian', points: 850, avatar: 'https://placehold.co/100x100.png', badges: [] },
   { rank: 5, user: 'HelpfulHenry', points: 720, avatar: 'https://placehold.co/100x100.png', badges: ['Top Reporter'] },
 ];
+

@@ -10,36 +10,21 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ThumbsUp, MessageSquare, ListFilter, MapPin, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "@/hooks/use-toast";
-import { getIssues, type Issue } from "@/lib/firebase/firestore";
+import { issues as mockIssues, type Issue } from "@/data/mock-data";
 
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchIssues = async () => {
-      try {
-        setLoading(true);
-        const fetchedIssues = await getIssues();
-        setIssues(fetchedIssues);
-      } catch (error) {
-        console.error("Error fetching issues: ", error);
-        toast({
-          variant: "destructive",
-          title: "Failed to load issues",
-          description: "There was a problem fetching issues from the database.",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchIssues();
+    // Simulate fetching data
+    setTimeout(() => {
+      setIssues(mockIssues);
+      setLoading(false);
+    }, 500);
   }, []);
 
   const handleUpvote = (issueId: string) => {
-    // In a real app, you would update the upvote count in Firestore.
-    // For now, we'll just optimistically update the UI.
     setIssues(prevIssues => 
         prevIssues.map(issue => 
             issue.id === issueId ? { ...issue, upvotes: issue.upvotes + 1 } : issue
@@ -115,7 +100,7 @@ export default function IssuesPage() {
                     {issues.map((issue) => (
                       <div key={issue.id} className="p-4 space-y-3 hover:bg-accent/50 transition-colors">
                         <div className="relative aspect-video w-full overflow-hidden rounded-md">
-                            {issue.mediaUrl && <Image src={issue.mediaUrl} alt={issue.title} layout="fill" objectFit="cover" />}
+                            {issue.imageUrl && <Image src={issue.imageUrl} alt={issue.title} layout="fill" objectFit="cover" />}
                         </div>
                         <div className="flex items-start justify-between">
                             <h3 className="font-semibold font-headline">{issue.title}</h3>
@@ -123,8 +108,8 @@ export default function IssuesPage() {
                         </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-2"><MapPin className="w-4 h-4"/> {issue.location}</p>
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <span>By {issue.reporterName === 'anonymous' ? 'Anonymous' : issue.reporterName}</span>
-                            <span>{issue.createdAt.toLocaleDateString()}</span>
+                            <span>By {issue.reporter === 'anonymous' ? 'Anonymous' : issue.reporter}</span>
+                            <span>{issue.reportedAt.toLocaleDateString()}</span>
                         </div>
                         <div className="flex gap-2 pt-2">
                             <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => handleUpvote(issue.id)}>
