@@ -28,6 +28,10 @@ import { useToast } from "@/hooks/use-toast";
 import { MapPin, Upload, Loader2 } from "lucide-react";
 import { issueCategories } from "@/data/mock-data";
 import Image from "next/image";
+import { storage } from "@/lib/firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { addIssue } from "@/lib/firebase/firestore";
+import { v4 as uuidv4 } from 'uuid';
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -78,22 +82,49 @@ export function IssueReportForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    
-    // This is a placeholder. We will connect this to Firebase in the next step.
-    console.log("Form submitted. No database connected. Data:", values);
+    let imageUrl: string | undefined = undefined;
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+        // 1. Upload media if it exists
+        if (values.media) {
+            const file = values.media;
+            const fileExtension = file.name.split('.').pop();
+            const storageRef = ref(storage, `issues/${uuidv4()}.${fileExtension}`);
+            
+            toast({ title: "Uploading media...", description: "Please wait while we upload your file." });
+            const uploadResult = await uploadBytes(storageRef, file);
+            imageUrl = await getDownloadURL(uploadResult.ref);
+            toast({ title: "Upload complete!", description: "Your file has been uploaded successfully." });
+        }
 
-    toast({
-        title: "Issue Reported (Mock)!",
-        description: "Your report has been logged to the console. We'll connect this to a database next.",
-    });
+        // 2. Add issue data to Firestore
+        await addIssue({
+            title: values.title,
+            description: values.description,
+            category: values.category,
+            location: values.location,
+            imageUrl: imageUrl,
+        });
 
-    form.reset();
-    setPreview(null);
-    setFileType(null);
-    setIsSubmitting(false);
+        toast({
+            title: "Issue Reported Successfully!",
+            description: "Thank you for helping improve your community.",
+        });
+
+        form.reset();
+        setPreview(null);
+        setFileType(null);
+
+    } catch (error) {
+        console.error("Error submitting issue:", error);
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: "There was a problem submitting your report. Please try again.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
