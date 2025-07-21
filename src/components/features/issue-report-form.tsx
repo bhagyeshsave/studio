@@ -79,6 +79,7 @@ export function IssueReportForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     
+    // This is a placeholder. We will connect this to Firebase in the next step.
     console.log("Form submitted. No database connected. Data:", values);
 
     // Simulate network delay
@@ -86,7 +87,7 @@ export function IssueReportForm() {
 
     toast({
         title: "Issue Reported (Mock)!",
-        description: "Your report has been logged to the console. No database is connected.",
+        description: "Your report has been logged to the console. We'll connect this to a database next.",
     });
 
     form.reset();
